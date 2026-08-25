@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>controlrobot.id - Advanced Dashboard</title>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        /* ==========================================================================
+           1. CSS VARIABLES & THEME SETUP
+           ========================================================================== */
+        :root {
+            --bg-base: #060608;         
+            --bg-sidebar: #101114;      
+            --bg-card: #15161a;         
+            --bg-input: #202126;        
+            
+            --text-main: #f2f4f8;       
+            --text-muted: #8b93a3;      
+            
+            --accent-blue: #3b82f6;     
+            --accent-cyan: #22d3ee;
+            --accent-purple: #a855f7;
+            --accent-glow: rgba(59, 130, 246, 0.5);
+            --accent-glow-cyan: rgba(34, 211, 238, 0.45);
+            --success: #10b981;         
+            --danger: #ef4444;          
+            --warning: #f59e0b;         
+            
+            --border-color: #24262c;
+            --border-glow: rgba(59, 130, 246, 0.25);
+            --shadow-card: 0 8px 24px rgba(0,0,0,0.5);
+            
+            --transition-fast: 0.15s ease;
+            --transition-normal: 0.3s ease;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+        body { background-color: var(--bg-base); color: var(--text-main); height: 100vh; overflow: hidden; display: flex; position: relative; }
+
+        /* ==========================================================================
+           BACKGROUND FUTURISTIK — canvas network, aurora, grid perspektif, scanline
+           ========================================================================== */
+        #networkCanvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -5; pointer-events: none;
+        }
+
+        .aurora-layer {
+            position: fixed; inset: 0; z-index: -4; pointer-events: none; overflow: hidden; opacity: 0.55;
+            animation: auroraLayerSpin 30s linear infinite;
+        }
+        @keyframes auroraLayerSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .aurora-blob {
+            position: absolute; border-radius: 50%; filter: blur(90px); mix-blend-mode: screen;
+        }
+        .aurora-1 { width: 620px; height: 620px; background: radial-gradient(circle, rgba(59,130,246,0.35), transparent 70%); top: -120px; left: -120px; animation: auroraFloat1 7.3s ease-in-out infinite; }
+        .aurora-2 { width: 520px; height: 520px; background: radial-gradient(circle, rgba(168,85,247,0.3), transparent 70%); bottom: -140px; right: -80px; animation: auroraFloat2 8.7s ease-in-out infinite; }
+        .aurora-3 { width: 480px; height: 480px; background: radial-gradient(circle, rgba(34,211,238,0.25), transparent 70%); top: 40%; left: 45%; animation: auroraFloat3 10s ease-in-out infinite; }
+        @keyframes auroraFloat1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(120px, 80px) scale(1.15); } }
+        @keyframes auroraFloat2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-100px, -60px) scale(1.2); } }
+        @keyframes auroraFloat3 { 0%,100% { transform: translate(-50%,-50%) scale(1); } 50% { transform: translate(-30%,-60%) scale(1.25); } }
+
+        /* Lantai grid perspektif 3D di bagian bawah layar, kesan "HUD sci-fi" */
+        .perspective-floor {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 45vh; z-index: -3; pointer-events: none;
+            background-image: linear-gradient(rgba(59,130,246,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,0.12) 1px, transparent 1px);
+            background-size: 60px 60px; transform: perspective(400px) rotateX(60deg); transform-origin: bottom;
+            -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,0.9), transparent 90%);
+            mask-image: linear-gradient(to top, rgba(0,0,0,0.9), transparent 90%);
+            animation: floorScroll 2s linear infinite;
+        }
+        @keyframes floorScroll { from { background-position: 0 0; } to { background-position: 0 60px; } }
+
+        /* Garis scan vertikal yang menyapu layar */
+        .scan-sweep {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; pointer-events: none; overflow: hidden;
+        }
+        .scan-sweep::before {
+            content: ''; position: absolute; top: 0; left: -20%; width: 20%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(59,130,246,0.06), transparent);
+            animation: sweepMove 2.7s ease-in-out infinite;
+        }
+        @keyframes sweepMove { 0% { left: -20%; } 50% { left: 100%; } 100% { left: -20%; } }
+
+        /* Scanline halus tipe monitor CRT */
+        .scanlines {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: repeating-linear-gradient(0deg, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(255,255,255,0.012) 3px, rgba(0,0,0,0) 4px);
+            pointer-events: none; z-index: 999; mix-blend-mode: overlay;
+        }
+
+        .cursor-glow {
+            position: absolute; width: 420px; height: 420px;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.16) 0%, transparent 60%);
+            border-radius: 50%; pointer-events: none; z-index: -1; transform: translate(-50%, -50%);
+            transition: left 0.1s ease-out, top 0.1s ease-out;
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #4a4d55; border-radius: 4px; }
+
+        /* ==========================================================================
+           2. LAYOUT & RIPPLE
+           ========================================================================== */
+        .app-container { display: flex; width: 100vw; height: 100vh; backdrop-filter: blur(1px); }
+
+        .ripple-element { position: relative; overflow: hidden; }
+        .ripple {
+            position: absolute; border-radius: 50%; transform: scale(0); animation: ripple-anim 0.6s linear;
+            background-color: rgba(255, 255, 255, 0.25); pointer-events: none;
+        }
+        @keyframes ripple-anim { to { transform: scale(4); opacity: 0; } }
+
+        /* --- SIDEBAR --- */
+        .sidebar {
+            width: 280px; background-color: rgba(16, 17, 20, 0.75); backdrop-filter: blur(18px);
+            border-right: 1px solid var(--border-color); display: flex; flex-direction: column; padding: 24px 16px;
+            z-index: 10; position: relative;
+        }
+        /* Garis tepi neon yang berdenyut di sisi kanan sidebar */
+        .sidebar::after {
+            content: ''; position: absolute; top: 0; right: -1px; width: 1px; height: 100%;
+            background: linear-gradient(180deg, transparent, var(--accent-cyan), var(--accent-purple), transparent);
+            animation: edgeGlow 4s ease-in-out infinite; opacity: 0.7;
+        }
+        @keyframes edgeGlow { 0%,100% { opacity: 0.3; } 50% { opacity: 0.9; } }
+
+        .brand-container { display: flex; align-items: center; gap: 16px; padding-bottom: 24px; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+        .brand-icon {
+            width: 42px; height: 42px; background: linear-gradient(135deg, #ffffff, #a0a5b1); border-radius: 10px;
+            display: flex; justify-content: center; align-items: center; color: var(--bg-base); font-weight: 800; font-size: 22px;
+            box-shadow: 0 0 20px rgba(59,130,246,0.35); animation: brandPulse 4s ease-in-out infinite; position: relative;
+        }
+        .brand-icon::before {
+            content: ''; position: absolute; inset: -4px; border-radius: 14px; border: 1px solid var(--accent-cyan); opacity: 0.4;
+            animation: ringPulse 3s ease-in-out infinite;
+        }
+        @keyframes ringPulse { 0%,100% { transform: scale(1); opacity: 0.35; } 50% { transform: scale(1.12); opacity: 0.05; } }
+        @keyframes brandPulse { 0%,100% { box-shadow: 0 0 14px rgba(59,130,246,0.3); } 50% { box-shadow: 0 0 26px rgba(168,85,247,0.55); } }
+        .brand-text {
+            font-size: 20px; font-weight: 700; letter-spacing: 0.5px;
+            background: linear-gradient(90deg, #fff, var(--accent-cyan)); -webkit-background-clip: text; background-clip: text; color: transparent;
+        }
+
+        .nav-menu { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+        .nav-item {
+            display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 10px; cursor: pointer; color: var(--text-muted);
+            font-weight: 600; transition: var(--transition-fast); border: 1px solid transparent; position: relative;
+        }
+        .nav-item:hover { background-color: var(--bg-input); color: var(--text-main); transform: translateX(4px); border-color: var(--border-glow); }
+        .nav-item.active {
+            background: linear-gradient(90deg, var(--accent-blue), #2f5fd6); color: #fff;
+            box-shadow: 0 4px 16px var(--accent-glow), 0 0 0 1px rgba(255,255,255,0.08) inset;
+        }
+        .nav-item.active::before {
+            content: ''; position: absolute; left: -16px; top: 50%; transform: translateY(-50%); width: 4px; height: 60%;
+            background: var(--accent-cyan); border-radius: 4px; box-shadow: 0 0 10px var(--accent-cyan);
+        }
+        .nav-icon { width: 22px; height: 22px; fill: currentColor; }
+
+        /* --- MAIN CONTENT --- */
+        .main-content { flex: 1; display: flex; flex-direction: column; position: relative; }
+        .top-header {
+            height: 80px; background-color: rgba(6, 6, 8, 0.55); backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;
+            padding: 0 40px; z-index: 5; position: relative;
+        }
+        .top-header::after {
+            content: ''; position: absolute; bottom: -1px; left: 0; width: 100%; height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+            animation: headerSweep 1.7s ease-in-out infinite;
+        }
+        @keyframes headerSweep { 0%,100% { opacity: 0.15; } 50% { opacity: 0.8; } }
+
+        .view-title {
+            font-size: 24px; font-weight: 700; letter-spacing: 0.5px; position: relative; color: #fff;
+            text-shadow: 0 0 14px var(--accent-glow-cyan), 0 0 28px rgba(168,85,247,0.25);
+        }
+        .connection-panel { display: flex; align-items: center; gap: 20px; }
+        
+        .status-badge {
+            display: flex; align-items: center; gap: 10px; background-color: rgba(255,255,255,0.04); padding: 10px 20px;
+            border-radius: 30px; font-size: 14px; font-weight: 600; border: 1px solid var(--border-color);
+            font-family: 'JetBrains Mono', monospace; letter-spacing: 0.5px;
+        }
+        .status-dot {
+            width: 12px; height: 12px; border-radius: 50%; background-color: var(--danger); box-shadow: 0 0 10px var(--danger);
+            transition: var(--transition-normal); animation: dotPulse 2s ease-in-out infinite;
+        }
+        @keyframes dotPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.55; transform: scale(1.25); } }
+        
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; border: none; transition: var(--transition-fast); text-transform: uppercase; color: #fff; letter-spacing: 0.5px; }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-blue), #6d28d9); position: relative; overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+        .btn-primary::after {
+            content: ''; position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
+            background: linear-gradient(120deg, transparent, rgba(255,255,255,0.4), transparent);
+            animation: btnSheen 3.2s ease-in-out infinite;
+        }
+        @keyframes btnSheen { 0% { left: -60%; } 100% { left: 130%; } }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 20px var(--accent-glow), 0 0 20px rgba(168,85,247,0.3); }
+        .btn-sm { padding: 8px 16px; font-size: 12px; background-color: #26272d; color: #fff; border-radius: 6px; border: 1px solid var(--border-color); }
+        .btn-sm:hover { background-color: #333; border-color: var(--accent-cyan); }
+
+        .view-container { flex: 1; padding: 40px; overflow-y: auto; display: none; animation: fadeInScale 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .view-container.active { display: block; }
+        @keyframes fadeInScale { from { opacity: 0; transform: scale(0.95) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+        /* ==========================================================================
+           3. WIDGETS & CARDS
+           ========================================================================== */
+        .card {
+            background-color: rgba(21, 22, 26, 0.72); backdrop-filter: blur(12px); border: 1px solid var(--border-color); border-radius: 12px;
+            padding: 24px; box-shadow: var(--shadow-card); display: flex; flex-direction: column; gap: 20px; position: relative; overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+        }
+        .card:hover { transform: translateY(-3px); box-shadow: 0 16px 32px rgba(0,0,0,0.6), 0 0 24px rgba(59,130,246,0.15); border-color: var(--border-glow); }
+
+        /* Sudut HUD di setiap card */
+        .card::before, .card::after {
+            content: ''; position: absolute; width: 18px; height: 18px; border: 2px solid var(--accent-cyan); opacity: 0.5; pointer-events: none; transition: opacity 0.3s ease;
+        }
+        .card::before { top: 8px; left: 8px; border-right: none; border-bottom: none; }
+        .card::after { bottom: 8px; right: 8px; border-left: none; border-top: none; }
+        .card:hover::before, .card:hover::after { opacity: 1; }
+        
+        .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+        .chart-value { font-size: 48px; font-weight: 700; font-family: 'JetBrains Mono', monospace; display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; text-shadow: 0 0 18px rgba(255,255,255,0.15); }
+        .chart-value .unit { font-size: 20px; color: var(--text-muted); font-weight: 500; font-family: 'Inter', sans-serif;}
+        .chart-container { position: relative; height: 180px; width: 100%; }
+
+        .radar-card { display: flex; flex-direction: row; justify-content: space-between; align-items: center; padding: 40px; border-top: 4px solid var(--accent-blue); box-shadow: 0 -2px 20px rgba(59,130,246,0.15), var(--shadow-card); }
+        .radar-info h3 { font-size: 22px; margin-bottom: 8px; }
+        .radar-info p { color: var(--text-muted); font-size: 15px; margin-bottom: 20px; }
+        .radar-info .status { font-size: 18px; font-family: 'JetBrains Mono', monospace; color: #fff;}
+        .radar-info .status span { color: var(--success); text-shadow: 0 0 10px rgba(16,185,129,0.6); }
+
+        .radar {
+            width: 200px; height: 200px; border-radius: 50%; background-color: #030d03;
+            border: 2px solid #0a290a; position: relative; overflow: hidden;
+            box-shadow: 0 0 40px rgba(0, 255, 0, 0.12), inset 0 0 30px rgba(0,255,0,0.05);
+        }
+        .radar::before { content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 1px; background: rgba(0, 255, 0, 0.3); }
+        .radar::after { content: ''; position: absolute; top: 0; left: 50%; width: 1px; height: 100%; background: rgba(0, 255, 0, 0.3); }
+        .radar-sweep {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 50%;
+            background: conic-gradient(from 0deg, transparent 70%, rgba(0, 255, 0, 0.6) 100%);
+            animation: radar-spin 3s linear infinite;
+        }
+        @keyframes radar-spin { 100% { transform: rotate(360deg); } }
+
+        .terminal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 16px; }
+        .terminal-title { font-size: 18px; font-weight: 600; }
+        .terminal-window {
+            background-color: #000; border-radius: 8px; padding: 20px; height: 450px;
+            overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 14px;
+            color: #4af626; line-height: 1.6; border: 1px solid #1a1a1a; box-shadow: inset 0 0 20px rgba(0,255,0,0.04);
+        }
+        .terminal-window p { margin: 0; }
+        .term-time { color: #777; margin-right: 10px; }
+
+        /* ==========================================================================
+           4. D-PAD, TRANSIT LOG & LED
+           ========================================================================== */
+        .override-layout { display: flex; gap: 48px; align-items: center; justify-content: center; height: 100%; min-height: 500px; flex-wrap: wrap; }
+        .dpad-wrapper { display: flex; justify-content: center; align-items: center; }
+        .dpad-container { display: grid; grid-template-columns: 90px 110px 90px; grid-template-rows: 90px 110px 90px; gap: 12px; }
+        .dpad-btn {
+            background: linear-gradient(145deg, #1a1b1f, #0d0d0f); border: 1px solid #333; border-radius: 16px; cursor: pointer;
+            display: flex; justify-content: center; align-items: center; transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.05);
+        }
+        .dpad-btn svg { width: 50%; height: 50%; stroke: #ffffff; fill: none; transition: all 0.2s ease; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+        .dpad-btn:hover { border-color: var(--accent-cyan); transform: translateY(-2px); box-shadow: 0 12px 20px rgba(0,0,0,0.7), 0 0 18px var(--accent-glow-cyan); }
+        .dpad-btn:active { transform: scale(0.9) translateY(4px); background: #ffffff; border-color: #ffffff; box-shadow: 0 0 30px rgba(255,255,255,0.7); }
+        .dpad-btn:active svg { stroke: #000000; filter: none; transform: scale(1.1); }
+        .dpad-up { grid-column: 2; grid-row: 1; } .dpad-left { grid-column: 1; grid-row: 2; } .dpad-right { grid-column: 3; grid-row: 2; } .dpad-down { grid-column: 2; grid-row: 3; }
+        .dpad-center { grid-column: 2; grid-row: 2; background: linear-gradient(145deg, #222, #111); border-radius: 50%; border: 3px solid #444; }
+        .dpad-center svg { stroke: none; fill: #ffffff; width: 40%; height: 40%; }
+        .dpad-center:hover { border-color: var(--accent-cyan); box-shadow: 0 0 18px var(--accent-glow-cyan); } .dpad-center:active { background: #ffffff; border-color: #fff; box-shadow: 0 0 32px rgba(255,255,255,0.85); } .dpad-center:active svg { fill: #000000; }
+
+        .command-log-card { width: 360px; max-width: 100%; padding: 0; align-self: stretch; }
+        .command-log-card .terminal-header { padding: 22px 22px 0 22px; border-bottom: none; }
+        .command-log-body { padding: 0 22px 22px 22px; display: flex; flex-direction: column; gap: 14px; height: 100%; }
+        .command-log-window {
+            background-color: #000; border-radius: 8px; padding: 16px; height: 420px; overflow-y: auto;
+            font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.9; border: 1px solid #1a1a1a;
+            display: flex; flex-direction: column; box-shadow: inset 0 0 20px rgba(34,211,238,0.04);
+        }
+        .command-log-window .cmd-empty { color: #4a4d55; font-style: normal; }
+        .cmd-line { display: flex; gap: 10px; align-items: center; opacity: 0; animation: cmdFadeIn 0.25s ease forwards; }
+        @keyframes cmdFadeIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }
+        .cmd-tag { padding: 2px 10px; border-radius: 4px; font-weight: 700; font-size: 11px; letter-spacing: 0.5px; }
+        .cmd-tag.up, .cmd-tag.down, .cmd-tag.left, .cmd-tag.right { background: rgba(34, 211, 238, 0.15); color: var(--accent-cyan); }
+        .cmd-tag.stop { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+        .current-cmd-bar {
+            display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 16px; font-family: 'JetBrains Mono', monospace;
+        }
+        .current-cmd-bar span:first-child { color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+        #currentCommandDisplay { font-size: 16px; font-weight: 700; color: var(--accent-cyan); transition: color 0.2s ease; text-shadow: 0 0 10px currentColor; }
+
+        .led-view-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; height: 100%; align-items: center; }
+        .led-illustration-container {
+            display: flex; justify-content: center; align-items: center; height: 450px;
+            background: radial-gradient(circle, var(--bg-card) 0%, #050506 100%); border-radius: 24px; border: 1px solid var(--border-color);
+            box-shadow: inset 0 0 60px rgba(0,0,0,0.85), 0 0 30px rgba(59,130,246,0.06);
+        }
+        .led-svg { width: 220px; height: auto; z-index: 2; transition: filter 0.4s; }
+        .led-glass { fill: #222; transition: fill 0.4s ease; } .led-filament { stroke: #444; transition: stroke 0.4s ease; }
+        .led-illustration-container.is-on .led-glass { fill: #fff176; } .led-illustration-container.is-on .led-filament { stroke: #ff9800; }
+        
+        .led-controls-container {
+            background-color: rgba(21, 22, 26, 0.85); padding: 48px; border-radius: 24px; border: 1px solid var(--border-color);
+            display: flex; flex-direction: column; gap: 40px; backdrop-filter: blur(12px);
+        }
+        .big-switch { position: relative; display: inline-block; width: 90px; height: 46px; } .big-switch input { opacity: 0; width: 0; height: 0; }
+        .big-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--bg-input); transition: .4s; border-radius: 46px; border: 2px solid var(--border-color); }
+        .big-slider:before { position: absolute; content: ""; height: 36px; width: 36px; left: 3px; bottom: 3px; background-color: var(--text-muted); transition: .4s; border-radius: 50%; }
+        input:checked + .big-slider { background-color: var(--success); border-color: var(--success); box-shadow: 0 0 16px rgba(16,185,129,0.4); } input:checked + .big-slider:before { transform: translateX(44px); background-color: white; }
+        
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 28px; width: 28px; border-radius: 50%; background: #fff; cursor: pointer; margin-top: -10px; box-shadow: 0 0 16px rgba(255,255,255,0.6); border: 2px solid var(--accent-cyan); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 10px; cursor: pointer; background: linear-gradient(90deg, #333, #666); border-radius: 5px; border: 1px solid var(--border-color); }
+    </style>
+</head>
+<body>
+
+    <!-- Background futuristik: network canvas, aurora, lantai perspektif, sweep, scanline -->
+    <canvas id="networkCanvas"></canvas>
+    <div class="aurora-layer">
+        <div class="aurora-blob aurora-1"></div>
+        <div class="aurora-blob aurora-2"></div>
+        <div class="aurora-blob aurora-3"></div>
+    </div>
+    <div class="perspective-floor"></div>
+    <div class="scan-sweep"></div>
+    <div class="cursor-glow" id="cursorGlow"></div>
+    <div class="scanlines"></div>
+
+    <div class="app-container">
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="brand-container">
+                <div class="brand-icon">CR</div>
+                <div class="brand-text">controlrobot.id</div>
+            </div>
+            <nav class="nav-menu">
+                <div class="nav-item ripple-element active" onclick="switchView('view-mission', this)">
+                    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                    <span>Mission Control</span>
+                </div>
+                <div class="nav-item ripple-element" onclick="switchView('view-dpad', this)">
+                    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M21 11h-4V7c0-1.1-.9-2-2-2h-6c-1.1 0-2 .9-2 2v4H3c-1.1 0-2 .9-2 2v6c0 1.1.9 2 2 2h4v4c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2v-4h4c1.1 0 2-.9 2-2v-6c0-1.1-.9-2-2-2zm-12 0H5v-2h4v2zm2-4h2v4h-2V7zm2 14h-2v-4h2v4zm6-6h-4v-2h4v2z"/></svg>
+                    <span>Manual Override</span>
+                </div>
+                <div class="nav-item ripple-element" onclick="switchView('view-led', this)">
+                    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-1.3l-.85-.6C7.8 13.27 7 11.23 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 2.23-.8 4.27-2.15 5.1z"/></svg>
+                    <span>Lighting Systems</span>
+                </div>
+                <div class="nav-item ripple-element" onclick="switchView('view-diagnostic', this)">
+                    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 C9.64,21.59,9.83,21.76,10.08,21.76h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+                    <span>System Diagnostics</span>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="view-title" id="top-title">Mission Control</div>
+                <div class="connection-panel">
+                    <div class="status-badge">
+                        <div class="status-dot" id="statusDot"></div>
+                        <span id="statusText">NO SIGNAL</span>
+                    </div>
+                    <button class="btn btn-primary ripple-element" id="connectBtn">INITIALIZE LINK</button>
+                </div>
+            </header>
+
+            <!-- VIEW 1: MISSION CONTROL -->
+            <div id="view-mission" class="view-container active">
+                <div class="grid-2col">
+                    <div class="card">
+                        <div class="chart-value">25.7 <span class="unit">°C</span></div>
+                        <div class="chart-container">
+                            <canvas id="tempChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="chart-value">56.8 <span class="unit">%</span></div>
+                        <div class="chart-container">
+                            <canvas id="humChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card radar-card">
+                    <div class="radar-info">
+                        <h3>Proximity Scanner</h3>
+                        <p>Mendeteksi objek di sekitar robot secara real-time.</p>
+                        <p class="status">Status: <span>CLEAR</span></p>
+                    </div>
+                    <div class="radar">
+                        <div class="radar-sweep"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 2: D-PAD (MANUAL OVERRIDE) + TRANSIT LOG -->
+            <div id="view-dpad" class="view-container">
+                <div class="override-layout">
+                    <div class="dpad-wrapper">
+                        <div class="dpad-container">
+                            <button class="dpad-btn dpad-up ripple-element"><svg viewBox="0 0 24 24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="4"></line><polyline points="5 11 12 4 19 11"></polyline></svg></button>
+                            <button class="dpad-btn dpad-left ripple-element"><svg viewBox="0 0 24 24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="20" y1="12" x2="4" y2="12"></line><polyline points="11 19 4 12 11 5"></polyline></svg></button>
+                            <button class="dpad-btn dpad-center ripple-element"><svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg></button>
+                            <button class="dpad-btn dpad-right ripple-element"><svg viewBox="0 0 24 24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="20" y2="12"></line><polyline points="13 5 20 12 13 19"></polyline></svg></button>
+                            <button class="dpad-btn dpad-down ripple-element"><svg viewBox="0 0 24 24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="20"></line><polyline points="19 13 12 20 5 13"></polyline></svg></button>
+                        </div>
+                    </div>
+
+                    <div class="card command-log-card">
+                        <div class="terminal-header">
+                            <div class="terminal-title">Transit Log</div>
+                            <button class="btn btn-sm ripple-element" onclick="clearCommandLog()">CLEAR LOG</button>
+                        </div>
+                        <div class="command-log-body">
+                            <div class="current-cmd-bar">
+                                <span>Current Command</span>
+                                <span id="currentCommandDisplay">STOP</span>
+                            </div>
+                            <div class="command-log-window" id="command-log">
+                                <p class="cmd-empty">// menunggu perintah pergerakan...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 3: LED CONTROLLER -->
+            <div id="view-led" class="view-container">
+                <div class="led-view-layout">
+                    <div class="led-illustration-container" id="ledIllustration">
+                        <svg class="led-svg" viewBox="0 0 100 150">
+                            <path d="M35 110 L65 110 L60 135 L40 135 Z" fill="#555" stroke="#333" stroke-width="2"/>
+                            <rect x="42" y="135" width="16" height="10" fill="#111" rx="3"/>
+                            <path class="led-glass" d="M50 10 C20 10 15 40 25 65 C30 75 35 90 35 110 L65 110 C65 90 70 75 75 65 C85 40 80 10 50 10 Z"/>
+                            <path class="led-filament" d="M42 110 L42 70 M58 110 L58 70 M42 70 L46 60 L54 60 L58 70" fill="none" stroke-width="3" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <div class="led-controls-container">
+                        <div>
+                            <span style="background: rgba(59, 130, 246, 0.1); color: var(--accent-blue); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;">⚙️ Modul Daya</span>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+                                <div style="font-size: 26px; font-weight: 800;">⚡ Master Power</div>
+                                <label class="big-switch ripple-element" style="border-radius: 50px;">
+                                    <input type="checkbox" id="ledToggleSwitch">
+                                    <span class="big-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div style="background: rgba(0,0,0,0.2); padding: 24px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.05);">
+                            <div style="display: flex; justify-content: space-between; font-size: 18px; font-weight: 700; margin-bottom: 20px;">
+                                <span>🎚️ Output Intensity</span>
+                                <span id="brightnessValueText" style="color: var(--accent-blue);">0</span>
+                            </div>
+                            <input type="range" id="ledBrightnessSlider" min="0" max="1023" value="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 4: SYSTEM DIAGNOSTICS -->
+            <div id="view-diagnostic" class="view-container">
+                <div class="card" style="padding: 0;">
+                    <div class="terminal-header" style="padding: 24px 24px 0 24px; border-bottom: none;">
+                        <div class="terminal-title">Diagnostics Terminal</div>
+                        <button class="btn btn-sm ripple-element" onclick="document.getElementById('terminal-logs').innerHTML=''">CLEAR BUFFER</button>
+                    </div>
+                    <div style="padding: 0 24px 24px 24px;">
+                        <div class="terminal-window" id="terminal-logs">
+                            <p><span class="term-time">[14:01:38]</span> RX: kelembaban:56.8</p>
+                            <p><span class="term-time">[14:01:40]</span> RX: suhu:24.6</p>
+                            <p><span class="term-time">[14:01:40]</span> RX: kelembaban:59.5</p>
+                            <p><span class="term-time">[14:01:42]</span> RX: suhu:24.1</p>
+                            <p><span class="term-time">[14:01:42]</span> RX: kelembaban:56.4</p>
+                            <p><span class="term-time">[14:01:44]</span> RX: suhu:24.8</p>
+                            <p><span class="term-time">[14:01:44]</span> RX: kelembaban:56.9</p>
+                            <p><span class="term-time">[14:01:46]</span> RX: suhu:24.9</p>
+                            <p><span class="term-time">[14:01:46]</span> RX: kelembaban:59.1</p>
+                            <p><span class="term-time">[14:02:03]</span> RX: suhu:25.6</p>
+                            <p><span class="term-time">[14:02:03]</span> RX: kelembaban:57.4</p>
+                            <p><span class="term-time">[14:03:03]</span> RX: suhu:25.7</p>
+                            <p><span class="term-time">[14:03:03]</span> RX: kelembaban:55.5</p>
+                            <p><span class="term-time">[14:04:03]</span> RX: suhu:25.5</p>
+                            <p><span class="term-time">[14:04:03]</span> RX: kelembaban:56.9</p>
+                            <p><span class="term-time">[14:05:03]</span> RX: suhu:25.5</p>
+                            <p><span class="term-time">[14:05:03]</span> RX: kelembaban:57.3</p>
+                            <p><span class="term-time">[14:05:04]</span> RX: suhu:25.6</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        /* ==========================================================================
+           0. BACKGROUND CANVAS — jaringan titik & garis bergerak (network effect)
+           ========================================================================== */
+        const netCanvas = document.getElementById('networkCanvas');
+        const netCtx = netCanvas.getContext('2d');
+        let netW, netH, particles = [];
+        const PARTICLE_COUNT = 110;
+        const LINK_DIST = 150;
+
+        // Partikel emoji robotik yang melayang pelan di background
+        const EMOJI_SET = ['🤖', '⚙️', '🔧', '📡', '🛰️', '🔩', '💾', '🦾'];
+        const EMOJI_COUNT = 26;
+        let emojiParticles = [];
+
+        // Starfield "warp speed" — bintang melesat keluar dari titik tengah, seluruh scene berputar pelan
+        const STAR_COUNT = 260;
+        let stars = [];
+        let globalRotation = 0;
+        let frameTick = 0;
+
+        function resizeNetCanvas() {
+            netW = netCanvas.width = window.innerWidth;
+            netH = netCanvas.height = window.innerHeight;
+        }
+        function initParticles() {
+            particles = Array.from({ length: PARTICLE_COUNT }, () => ({
+                x: Math.random() * netW,
+                y: Math.random() * netH,
+                vx: (Math.random() - 0.5) * 1.05,
+                vy: (Math.random() - 0.5) * 1.05,
+            }));
+        }
+        function initEmojiParticles() {
+            emojiParticles = Array.from({ length: EMOJI_COUNT }, () => ({
+                emoji: EMOJI_SET[Math.floor(Math.random() * EMOJI_SET.length)],
+                x: Math.random() * netW,
+                y: Math.random() * netH,
+                size: 42 + Math.random() * 46,
+                vy: -(0.6 + Math.random() * 1.05),
+                vx: (Math.random() - 0.5) * 0.75,
+                drift: Math.random() * Math.PI * 2,
+                driftSpeed: 0.012 + Math.random() * 0.024,
+                baseX: 0,
+                opacity: 0.4 + Math.random() * 0.4,
+                rotation: (Math.random() - 0.5) * 0.5,
+                rotSpeed: (Math.random() - 0.5) * 0.009,
+            }));
+            emojiParticles.forEach(p => p.baseX = p.x);
+        }
+        function initStars() {
+            const maxR = Math.sqrt(netW * netW + netH * netH) / 2;
+            stars = Array.from({ length: STAR_COUNT }, () => ({
+                theta: Math.random() * Math.PI * 2,
+                r: Math.random() * maxR,
+                maxR: maxR,
+                speed: 0.45 + Math.random() * 2.7,
+                size: 0.6 + Math.random() * 1.8,
+                twinklePhase: Math.random() * Math.PI * 2,
+                twinkleSpeed: 0.02 + Math.random() * 0.05,
+                bright: Math.random() < 0.12,
+            }));
+        }
+        function stepNetwork() {
+            frameTick++;
+            netCtx.clearRect(0, 0, netW, netH);
+
+            const cx = netW / 2, cy = netH / 2;
+            globalRotation += 0.00105; // rotasi galaksi, dipercepat 3x
+
+            netCtx.save();
+            netCtx.translate(cx, cy);
+            netCtx.rotate(globalRotation);
+            netCtx.translate(-cx, -cy);
+
+            // --- Starfield: bintang melesat keluar dari tengah, efek "terbang di luar angkasa" ---
+            for (const s of stars) {
+                s.r += s.speed;
+                if (s.r > s.maxR) { s.r = Math.random() * 20; s.theta = Math.random() * Math.PI * 2; }
+                const x = cx + Math.cos(s.theta) * s.r;
+                const y = cy + Math.sin(s.theta) * s.r;
+                const depth = s.r / s.maxR;
+                const twinkle = 0.5 + 0.5 * Math.sin(frameTick * s.twinkleSpeed + s.twinklePhase);
+                const size = s.size * (0.5 + depth * 1.2);
+                const alpha = (0.25 + depth * 0.6) * (s.bright ? twinkle : 1);
+
+                netCtx.beginPath();
+                netCtx.arc(x, y, size, 0, Math.PI * 2);
+                netCtx.fillStyle = s.bright ? `rgba(190, 225, 255, ${alpha})` : `rgba(255, 255, 255, ${alpha * 0.8})`;
+                if (s.bright) { netCtx.shadowColor = 'rgba(120, 190, 255, 0.9)'; netCtx.shadowBlur = size * 4; }
+                else { netCtx.shadowBlur = 0; }
+                netCtx.fill();
+                netCtx.shadowBlur = 0;
+            }
+
+            // --- Titik & garis jaringan ---
+            for (const p of particles) {
+                p.x += p.vx; p.y += p.vy;
+                if (p.x < 0 || p.x > netW) p.vx *= -1;
+                if (p.y < 0 || p.y > netH) p.vy *= -1;
+            }
+            for (let i = 0; i < particles.length; i++) {
+                for (let j = i + 1; j < particles.length; j++) {
+                    const a = particles[i], b = particles[j];
+                    const dx = a.x - b.x, dy = a.y - b.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < LINK_DIST) {
+                        netCtx.strokeStyle = `rgba(59, 130, 246, ${0.16 * (1 - dist / LINK_DIST)})`;
+                        netCtx.lineWidth = 1;
+                        netCtx.beginPath();
+                        netCtx.moveTo(a.x, a.y);
+                        netCtx.lineTo(b.x, b.y);
+                        netCtx.stroke();
+                    }
+                }
+            }
+            for (const p of particles) {
+                netCtx.beginPath();
+                netCtx.arc(p.x, p.y, 1.8, 0, Math.PI * 2);
+                netCtx.fillStyle = 'rgba(34, 211, 238, 0.5)';
+                netCtx.fill();
+            }
+
+            // Partikel emoji robotik melayang naik perlahan dengan drift horizontal
+            for (const e of emojiParticles) {
+                e.y += e.vy;
+                e.drift += e.driftSpeed;
+                e.baseX += e.vx;
+                e.x = e.baseX + Math.sin(e.drift) * 30;
+                e.rotation += e.rotSpeed;
+
+                if (e.y < -40) {
+                    e.y = netH + 40;
+                    e.baseX = Math.random() * netW;
+                    e.emoji = EMOJI_SET[Math.floor(Math.random() * EMOJI_SET.length)];
+                }
+                if (e.baseX < -60) e.baseX = netW + 60;
+                if (e.baseX > netW + 60) e.baseX = -60;
+
+                netCtx.save();
+                netCtx.globalAlpha = e.opacity;
+                netCtx.translate(e.x, e.y);
+                netCtx.rotate(e.rotation);
+                netCtx.font = `${e.size}px sans-serif`;
+                netCtx.textAlign = 'center';
+                netCtx.textBaseline = 'middle';
+                // Glow di belakang emoji biar keliatan lebih menyala/nyata, bukan flat
+                netCtx.shadowColor = 'rgba(59, 130, 246, 0.9)';
+                netCtx.shadowBlur = e.size * 0.5;
+                netCtx.fillText(e.emoji, 0, 0);
+                netCtx.shadowBlur = 0;
+                netCtx.fillText(e.emoji, 0, 0);
+                netCtx.restore();
+            }
+
+            netCtx.restore();
+            requestAnimationFrame(stepNetwork);
+        }
+        resizeNetCanvas();
+        initParticles();
+        initEmojiParticles();
+        initStars();
+        stepNetwork();
+        window.addEventListener('resize', () => { resizeNetCanvas(); initParticles(); initEmojiParticles(); initStars(); });
+
+        /* ==========================================================================
+           1. EFEK UI & NAVIGASI
+           ========================================================================== */
+        const cursorGlow = document.getElementById('cursorGlow');
+        document.addEventListener('mousemove', (e) => {
+            cursorGlow.style.left = e.clientX + 'px';
+            cursorGlow.style.top = e.clientY + 'px';
+        });
+
+        function createRipple(event) {
+            const button = event.currentTarget;
+            const circle = document.createElement("span");
+            const diameter = Math.max(button.clientWidth, button.clientHeight);
+            const radius = diameter / 2;
+            circle.style.width = circle.style.height = `${diameter}px`;
+            circle.style.left = `${event.clientX - button.getBoundingClientRect().left - radius}px`;
+            circle.style.top = `${event.clientY - button.getBoundingClientRect().top - radius}px`;
+            circle.classList.add("ripple");
+            
+            const existingRipple = button.querySelector('.ripple');
+            if (existingRipple) { existingRipple.remove(); }
+            button.appendChild(circle);
+            setTimeout(() => circle.remove(), 600);
+        }
+        document.querySelectorAll('.ripple-element').forEach(btn => { btn.addEventListener('mousedown', createRipple); });
+
+        function switchView(viewId, navElement) {
+            document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+            navElement.classList.add('active');
+            document.getElementById('top-title').innerText = navElement.querySelector('span').innerText;
+        }
+
+        /* ==========================================================================
+           2. CHART.JS & LED LOGIC
+           ========================================================================== */
+        const ledToggle = document.getElementById('ledToggleSwitch');
+        const ledSlider = document.getElementById('ledBrightnessSlider');
+        const ledSvg = document.querySelector('.led-svg');
+        function updateLedGlow(val) {
+            const p = val / 1023;
+            ledSvg.style.filter = `drop-shadow(0 0 ${10 + 80*p}px rgba(255, 241, 118, ${0.4 + 0.6*p}))`;
+        }
+        ledToggle.addEventListener('change', e => {
+            if(e.target.checked) {
+                if(ledSlider.value == 0) ledSlider.value = 1023;
+                document.getElementById('ledIllustration').classList.add('is-on');
+                updateLedGlow(ledSlider.value);
+            } else {
+                ledSlider.value = 0; document.getElementById('ledIllustration').classList.remove('is-on');
+                ledSvg.style.filter = 'none';
+            }
+            document.getElementById('brightnessValueText').innerText = ledSlider.value;
+        });
+        ledSlider.addEventListener('input', e => {
+            const val = e.target.value;
+            document.getElementById('brightnessValueText').innerText = val;
+            if (val > 0) {
+                if(!ledToggle.checked) { ledToggle.checked = true; document.getElementById('ledIllustration').classList.add('is-on'); }
+                updateLedGlow(val);
+            } else {
+                ledToggle.checked = false; document.getElementById('ledIllustration').classList.remove('is-on');
+                ledSvg.style.filter = 'none';
+            }
+        });
+
+        const commonOptions = {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            elements: { point: { radius: 0 }, line: { tension: 0.4, borderWidth: 3 } },
+            scales: {
+                x: { display: false },
+                y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, border: { display: false }, ticks: { color: '#888', font: {family: 'JetBrains Mono'} } }
+            },
+            interaction: { intersect: false }
+        };
+
+        const ctxTemp = document.getElementById('tempChart').getContext('2d');
+        const gradientTemp = ctxTemp.createLinearGradient(0, 0, 0, 200);
+        gradientTemp.addColorStop(0, 'rgba(239, 68, 68, 0.3)'); gradientTemp.addColorStop(1, 'rgba(239, 68, 68, 0)');
+        new Chart(ctxTemp, { type: 'line', data: { labels: Array.from({length: 20}, (_, i) => i), datasets: [{ data: [25.6, 25.9, 24.2, 24.5, 24.8, 25.5, 25.3, 25.6, 24.3, 25.2, 24.6, 24.5, 24.7, 24.2, 24.1, 24.6, 24.0, 24.8, 24.9, 25.6, 25.7, 25.5, 25.5, 25.6, 25.7], borderColor: '#ef4444', backgroundColor: gradientTemp, fill: true }] }, options: { ...commonOptions, scales: { y: { min: 24.0, max: 26.0, ticks: {stepSize: 0.2, color: '#888'} } } } });
+
+        const ctxHum = document.getElementById('humChart').getContext('2d');
+        const gradientHum = ctxHum.createLinearGradient(0, 0, 0, 200);
+        gradientHum.addColorStop(0, 'rgba(16, 185, 129, 0.3)'); gradientHum.addColorStop(1, 'rgba(16, 185, 129, 0)');
+        new Chart(ctxHum, { type: 'line', data: { labels: Array.from({length: 20}, (_, i) => i), datasets: [{ data: [57.8, 58.8, 56.4, 56.2, 57.1, 59.4, 58.1, 58.3, 55.5, 58.2, 55.4, 56.8, 58.3, 57.4, 59.9, 56.9, 59.5, 56.4, 56.8, 59.1, 57.8, 55.6, 56.9, 57.1, 59.6, 56.8], borderColor: '#10b981', backgroundColor: gradientHum, fill: true }] }, options: { ...commonOptions, scales: { y: { min: 55.0, max: 60.0, ticks: {stepSize: 0.5, color: '#888'} } } } });
+
+        /* ==========================================================================
+           3. TRANSIT LOG (LAPORAN PERINTAH D-PAD)
+           ========================================================================== */
+        const commandLogEl = document.getElementById('command-log');
+        const currentCommandDisplay = document.getElementById('currentCommandDisplay');
+        const MAX_LOG_ENTRIES = 80;
+
+        function formatTime() {
+            return new Date().toTimeString().split(' ')[0];
+        }
+
+        function logCommand(cmd) {
+            if (!commandLogEl) return;
+
+            const emptyState = commandLogEl.querySelector('.cmd-empty');
+            if (emptyState) emptyState.remove();
+
+            const line = document.createElement('p');
+            line.className = 'cmd-line';
+            line.innerHTML = `<span class="term-time">[${formatTime()}]</span> TX: <span class="cmd-tag ${cmd}">${cmd.toUpperCase()}</span>`;
+            commandLogEl.appendChild(line);
+            commandLogEl.scrollTop = commandLogEl.scrollHeight;
+
+            while (commandLogEl.children.length > MAX_LOG_ENTRIES) {
+                commandLogEl.removeChild(commandLogEl.firstChild);
+            }
+
+            if (currentCommandDisplay) {
+                currentCommandDisplay.innerText = cmd.toUpperCase();
+                currentCommandDisplay.style.color = (cmd === 'stop') ? 'var(--danger)' : 'var(--accent-cyan)';
+            }
+        }
+
+        function clearCommandLog() {
+            if (!commandLogEl) return;
+            commandLogEl.innerHTML = '<p class="cmd-empty">// menunggu perintah pergerakan...</p>';
+        }
+
+        /* ==========================================================================
+           4. WEB BLUETOOTH & D-PAD OVERRIDE LOGIC
+           ========================================================================== */
+        let bluetoothDevice;
+        let txCharacteristic;
+        let currentCommand = "stop"; 
+        let commandLoop;
+
+        const UART_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+        const UART_RX_CHARACTERISTIC_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+
+        const connectBtn = document.getElementById('connectBtn');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+
+        connectBtn.addEventListener('click', async () => {
+            if (bluetoothDevice && bluetoothDevice.gatt.connected) {
+                bluetoothDevice.gatt.disconnect();
+                return;
+            }
+
+            try {
+                statusText.innerText = "MENCARI...";
+                bluetoothDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ namePrefix: 'BBC micro:bit' }],
+                    optionalServices: [UART_SERVICE_UUID]
+                });
+
+                statusText.innerText = "MENGHUBUNGKAN...";
+                const server = await bluetoothDevice.gatt.connect();
+                const service = await server.getPrimaryService(UART_SERVICE_UUID);
+                txCharacteristic = await service.getCharacteristic(UART_RX_CHARACTERISTIC_UUID);
+
+                statusDot.style.backgroundColor = 'var(--success)';
+                statusDot.style.boxShadow = '0 0 10px var(--success)';
+                statusText.innerText = "LINK ACTIVE";
+                connectBtn.innerText = "DISCONNECT";
+                connectBtn.classList.remove('btn-primary');
+                connectBtn.style.backgroundColor = 'var(--danger)';
+
+                bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
+                commandLoop = setInterval(() => {
+                    sendBluetoothData(currentCommand);
+                }, 150);
+
+            } catch (error) {
+                console.error("Koneksi gagal:", error);
+                statusText.innerText = "GAGAL KONEK";
+                setTimeout(() => { statusText.innerText = "NO SIGNAL"; }, 2000);
+            }
+        });
+
+        function onDisconnected() {
+            statusDot.style.backgroundColor = 'var(--danger)';
+            statusDot.style.boxShadow = '0 0 10px var(--danger)';
+            statusText.innerText = "NO SIGNAL";
+            connectBtn.innerText = "INITIALIZE LINK";
+            connectBtn.classList.add('btn-primary');
+            connectBtn.style.backgroundColor = '';
+            clearInterval(commandLoop);
+        }
+
+        async function sendBluetoothData(cmd) {
+            if (!txCharacteristic) return;
+            try {
+                let encoder = new TextEncoder();
+                let data = encoder.encode(cmd + "\n");
+                await txCharacteristic.writeValue(data);
+            } catch (error) {
+                console.error("Gagal ngirim perintah:", error);
+            }
+        }
+
+        const btnUp = document.querySelector('.dpad-up');
+        const btnDown = document.querySelector('.dpad-down');
+        const btnLeft = document.querySelector('.dpad-left');
+        const btnRight = document.querySelector('.dpad-right');
+
+        const pressEvents = ['mousedown', 'touchstart'];
+        const releaseEvents = ['mouseup', 'mouseleave', 'touchend'];
+
+        function setCommand(cmd) {
+            if (currentCommand === cmd) return;
+            currentCommand = cmd;
+            logCommand(cmd);
+        }
+        function stopCommand() {
+            if (currentCommand === "stop") return;
+            currentCommand = "stop";
+            logCommand("stop");
+        }
+
+        pressEvents.forEach(evt => {
+            btnUp.addEventListener(evt, (e) => { e.preventDefault(); setCommand("up"); });
+            btnDown.addEventListener(evt, (e) => { e.preventDefault(); setCommand("down"); });
+            btnLeft.addEventListener(evt, (e) => { e.preventDefault(); setCommand("left"); });
+            btnRight.addEventListener(evt, (e) => { e.preventDefault(); setCommand("right"); });
+        });
+
+        releaseEvents.forEach(evt => {
+            btnUp.addEventListener(evt, (e) => { e.preventDefault(); stopCommand(); });
+            btnDown.addEventListener(evt, (e) => { e.preventDefault(); stopCommand(); });
+            btnLeft.addEventListener(evt, (e) => { e.preventDefault(); stopCommand(); });
+            btnRight.addEventListener(evt, (e) => { e.preventDefault(); stopCommand(); });
+        });
+    </script>
+</body>
+</html>
